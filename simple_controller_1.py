@@ -1,5 +1,6 @@
 """camera_pid controller."""
 
+# Librerías necesarias para el control del robot y procesamiento de imágenes
 from controller import Display, Keyboard, Robot, Camera
 from vehicle import Car, Driver
 import numpy as np
@@ -7,7 +8,7 @@ import cv2
 from datetime import datetime
 import os
 
-#Getting image from camera
+# Función para obtener la imagen capturada por la cámara
 def get_image(camera):
     raw_image = camera.getImage()  
     image = np.frombuffer(raw_image, np.uint8).reshape(
@@ -15,7 +16,7 @@ def get_image(camera):
     )
     return image
 
-#Lines processing
+# Procesamiento de las líneas detectadas en la imagen
 def average_slope_intercept(lines):
     left_lines = [] #(slope, intercept)
     left_weights = [] #(length,)
@@ -47,6 +48,7 @@ def average_slope_intercept(lines):
     right_lane = np.dot(right_weights, right_lines) / np.sum(right_weights) if len(right_weights) > 0 else (None, None)
     return left_lane, right_lane
 
+# Conversión de coordenadas de píxeles a puntos en la imagen
 def pixel_points(y1, y2, line):
 	if line is None:
 		return None
@@ -57,6 +59,7 @@ def pixel_points(y1, y2, line):
 	y2 = int(y2)
 	return x1, y1, x2, y2
 
+# Detección de líneas de carril
 def lane_lines(lines, image_high):
     left_lane, right_lane = average_slope_intercept(lines)
     left_slope, right_slope = left_lane[0], right_lane[0]
@@ -69,7 +72,7 @@ def lane_lines(lines, image_high):
     right_line = pixel_points(y1, y2, right_lane) if right_slope is not None else None
     return (left_line, right_line), (left_slope, right_slope)
 
-	
+# Dibujo de las líneas de carril sobre la imagen
 def draw_lane_lines(image, lines, color=[255, 0, 0], thickness=12):
 	line_image = np.zeros_like(image)
 	for line in lines:
@@ -77,7 +80,7 @@ def draw_lane_lines(image, lines, color=[255, 0, 0], thickness=12):
 			cv2.line(line_image, *line, color, thickness)
 	return cv2.addWeighted(image, 1.0, line_image, 1.0, 0.0)
 
-#Image processing
+# Procesamiento de la imagen para detección de líneas
 def greyscale_cv2(image):
     gray_img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     return gray_img
@@ -124,15 +127,23 @@ def line_cv2(img_mask):
         cv2.line(img_lines, (x1,y1), (x2,y2), [0, 255, 0], 3)
     return img_lines, both_lane_slopes
 
+# Procesamiento de la imagen para detección de líneas de carril y cálculo del ángulo de dirección
 def lane_cv2(image):
+    # Convertir la imagen a formato RGB
     rgb_image = rgb_cv2(image)
+    # Convertir la imagen a escala de grises
     grey_image = greyscale_cv2(image)
+    # Aplicar el algoritmo de detección de bordes Canny para resaltar los bordes en la imagen
     edge_image = canny_edges_cv2(grey_image)
+    # Definir la región de interés en la imagen donde se espera encontrar las líneas de carril
     mask_image = mask_cv2(edge_image)
+    # Aplicar la Transformada de Hough para detectar las líneas en la región de interés
     line_image, both_lane_slopes = line_cv2(mask_image)
 
+    # Calcular el ángulo de dirección automático basado en las pendientes de las líneas de carril detectadas
     auto_steering_angle = calc_auto_steering_angle(both_lane_slopes[0], both_lane_slopes[1])
 
+    # Combinar la imagen original con las líneas de carril detectadas para visualización
     alpha = 1
     beta = 1
     gamma = 1
@@ -140,6 +151,7 @@ def lane_cv2(image):
 
     return img_lane_lines, auto_steering_angle
 
+# Cálculo del ángulo de dirección automático
 def calc_auto_steering_angle(left_lane_slope, right_lane_slope):
     global auto_steering
 
